@@ -31,7 +31,7 @@ exports.createEquipment = async (req, res) => {
 exports.getAllEquipment = async (req, res) => {
   try {
     const { category, available, q } = req.query;
-    const where = { available: 'active' };
+    const where = { available: '1' };
 
     if (category) where.category = category;
     if (available === 'true') where.availableQuantity = { $gt: 0 }; // using Sequelize v5 style 
