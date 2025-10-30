@@ -1,8 +1,7 @@
-// src/controllers/authController.js
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { User } = require('../models'); // adjust path if needed
+const { User } = require('../models'); 
 
 const signToken = (user) => {
   const payload = { id: user.id, email: user.email, role: user.role };

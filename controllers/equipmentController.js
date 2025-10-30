@@ -1,9 +1,6 @@
-// controller/equipmentController.js
 const { Equipment } = require('../models')
 
-/**
- * Create new equipment (Admin only)
- */
+ //Create new equipment (Admin only)
 exports.createEquipment = async (req, res) => {
   try {
     const { name, category, condition_status, quantity, status } = req.body;
@@ -37,7 +34,7 @@ exports.getAllEquipment = async (req, res) => {
     const where = { available: 'active' };
 
     if (category) where.category = category;
-    if (available === 'true') where.availableQuantity = { $gt: 0 }; // Sequelize v5 style; we'll adapt below
+    if (available === 'true') where.availableQuantity = { $gt: 0 }; // using Sequelize v5 style 
 
     // For Sequelize v6 use Sequelize.Op
     const { Op } = require('sequelize');
