@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
 exports.authenticate = async (req, res, next) => {
+  console.log("-=-=-=- In auth middleware -=-=-=");
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ message: 'Missing token' });
 
@@ -14,6 +15,7 @@ exports.authenticate = async (req, res, next) => {
     const user = await User.findByPk(decoded.id, { attributes: ['id', 'name', 'email', 'role'] });
     if (!user) return res.status(401).json({ message: 'Invalid token - user not found' });
     req.user = user;
+    console.log("-=-=-= user : ", user);
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Invalid or expired token' });
@@ -24,7 +26,10 @@ exports.authenticate = async (req, res, next) => {
 exports.authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
-    if (!allowedRoles.includes(req.user.role)) return res.status(403).json({ message: 'Forbidden - insufficient role' });
+    if (!allowedRoles.includes(req.user.role)) {
+      console.log("-=-== User type : ",req.user.role )
+      return res.status(403).json({ message: 'Forbidden - insufficient role' });
+    }
     next();
   };
 };

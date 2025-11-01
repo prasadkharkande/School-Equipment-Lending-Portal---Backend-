@@ -13,7 +13,7 @@ exports.createEquipment = async (req, res) => {
       category,
       condition_status: condition_status || 'Good',
       quantity: parseInt(quantity, 10),
-      availableQuantity: parseInt(quantity, 10),
+      available: parseInt(1),
       status: status || 'active'
     });
 
@@ -122,7 +122,7 @@ exports.deleteEquipment = async (req, res) => {
     if (!eq) return res.status(404).json({ message: 'Equipment not found' });
 
     // Soft delete
-    eq.status = 'inactive';
+    eq.available = 0;
     await eq.save();
 
     res.json({ message: 'Equipment marked inactive' });

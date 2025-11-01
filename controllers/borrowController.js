@@ -4,15 +4,17 @@ const { Op } = require('sequelize');
 // Student creates a borrow request
 exports.createRequest = async (req, res) => {
   try {
-    const { equipment_id, start_date, end_date } = req.body;
+    const { equipment_id, request_date, return_date } = req.body;
     const user_id = req.user.id; // from JWT
 
-    if (!equipment_id || !start_date || !end_date)
-      return res.status(400).json({ message: 'equipment_id, start_date, end_date required' });
+    if (!equipment_id || !request_date || !return_date)
+      return res.status(400).json({ message: 'equipment_id, request_date, return_date required' });
 
     const equipment = await Equipment.findByPk(equipment_id);
-    if (!equipment || equipment.status !== 'active')
-      return res.status(404).json({ message: 'Equipment not available' });
+    console.log("-=-=-= equipment : ", equipment);
+    console.log("-=-=-= equipment.status : ", equipment.status, "  equipment.dataValues.available : ", !equipment.dataValues.available);
+    // if (!equipment || equipment.status !== 'active' || equipment.dataValues.available != 0)
+    //   return res.status(404).json({ message: 'Equipment not available' });
 
     // Prevent overlapping bookings
     const overlapping = await BorrowRequest.findOne({
@@ -20,8 +22,8 @@ exports.createRequest = async (req, res) => {
         equipment_id,
         status: { [Op.in]: ['pending', 'approved'] },
         [Op.or]: [
-          { start_date: { [Op.between]: [start_date, end_date] } },
-          { end_date: { [Op.between]: [start_date, end_date] } }
+          { request_date: { [Op.between]: [request_date, return_date] } },
+          { return_date: { [Op.between]: [request_date, return_date] } }
         ]
       }
     });
@@ -32,8 +34,8 @@ exports.createRequest = async (req, res) => {
     const newReq = await BorrowRequest.create({
       equipment_id,
       user_id,
-      start_date,
-      end_date
+      request_date,
+      return_date
     });
 
     res.status(201).json({ message: 'Request submitted', request: newReq });
@@ -57,12 +59,25 @@ exports.updateStatus = async (req, res) => {
 
     if (status === 'approved') {
       const equipment = await Equipment.findByPk(request.equipment_id);
-      if (equipment.availableQuantity <= 0)
+      if (equipment.dataValues.quantity <= 0)
         return res.status(400).json({ message: 'No available units left' });
 
-      equipment.availableQuantity -= 1;
+      equipment.quantity -= 1;
+      // const equipmentId =  equipment.equipment_id ? equipment.equipment_id : equipment.dataValues.equipment_id;
+      // const availableQty = equipment.quantity ? equipment.quantity : equipment.dataValues.quantity;
+      // //await equipment.save();
+
+      //equipment.quantity =  - 1;
       await equipment.save();
+      console.log("equipment.quantity  : ", equipment.quantity);
+      
+      console.log("-=-=- equipment : ", equipment);
+      //console.log(" availableQty", availableQty , "  new availableQty  : ", availableQty );
+      
+      console.log("-=-=-start : ");
+      
     }
+    console.log("-=-= end  : ");
 
     request.status = status;
     if (remarks) request.remarks = remarks;
@@ -86,7 +101,7 @@ exports.markReturned = async (req, res) => {
       return res.status(400).json({ message: 'Only approved items can be returned' });
 
     const equipment = await Equipment.findByPk(request.equipment_id);
-    equipment.availableQuantity += 1;
+    equipment.quantity += 1;
     await equipment.save();
 
     request.status = 'returned';
