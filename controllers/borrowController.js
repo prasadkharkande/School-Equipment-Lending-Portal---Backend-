@@ -1,14 +1,25 @@
 const { BorrowRequest, Equipment, User } = require('../models');
 const { Op } = require('sequelize');
 
+// Helper function for consistent response structure
+const createResponse = (success, data, message = null, metadata = null) => {
+  const response = { success };
+  if (message) response.message = message;
+  if (data) response.data = data;
+  if (metadata) response.metadata = metadata;
+  return response;
+};
+
 // Student creates a borrow request
 exports.createRequest = async (req, res) => {
   try {
     const { equipment_id, request_date, return_date } = req.body;
-    const user_id = req.user.id; // from JWT
+    const user_id = req.user.id;
 
-    if (!equipment_id || !request_date || !return_date)
-      return res.status(400).json({ message: 'equipment_id, request_date, return_date required' });
+    if (!equipment_id || !request_date || !return_date) {
+      return res.status(400).json(createResponse(false, null, 
+        'equipment_id, request_date, and return_date are required'));
+    }
 
     const equipment = await Equipment.findByPk(equipment_id);
     console.log("-=-=-= equipment : ", equipment);
@@ -38,10 +49,15 @@ exports.createRequest = async (req, res) => {
       return_date
     });
 
-    res.status(201).json({ message: 'Request submitted', request: newReq });
+    return res.status(201).json(createResponse(true, 
+      { request: newReq }, 
+      'Request submitted successfully'));
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error', error: err.message });
+    return res.status(500).json(createResponse(false, null, 
+      'Server error occurred', 
+      { error: process.env.NODE_ENV === 'development' ? err.message : undefined }));
   }
 };
 
@@ -114,34 +130,103 @@ exports.markReturned = async (req, res) => {
   }
 };
 
-// Student: view own requests
-exports.getMyRequests = async (req, res) => {
+// Admin: view all requests with pagination
+exports.getAllRequests = async (req, res) => {
   try {
-    const user_id = req.user.id;
-    const requests = await BorrowRequest.findAll({
-      where: { user_id },
-      include: [{ model: Equipment, attributes: ['name', 'category'] }]
+    // Pagination parameters
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const offset = (page - 1) * limit;
+
+    // Status filter
+    const status = req.query.status;
+    const where = status ? { status } : {};
+
+    // Get total count and requests
+    const { count, rows: requests } = await BorrowRequest.findAndCountAll({
+      where,
+      include: [
+        { 
+          model: Equipment, 
+          attributes: ['name', 'category'] 
+        },
+        { 
+          model: User, 
+          attributes: ['name', 'email'] 
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
     });
-    res.json({ requests });
+
+    // Format the response
+    const totalPages = Math.ceil(count / limit);
+    
+    return res.json(createResponse(true, 
+      { requests }, 
+      'Requests retrieved successfully',
+      {
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems: count,
+          itemsPerPage: limit,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1
+        },
+        filters: { status },
+        timestamp: new Date().toISOString()
+      }
+    ));
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json(createResponse(false, null, 
+      'Server error occurred',
+      { error: process.env.NODE_ENV === 'development' ? err.message : undefined }));
   }
 };
 
-// Admin: view all requests
-exports.getAllRequests = async (req, res) => {
+// Student: view own requests with pagination
+exports.getMyRequests = async (req, res) => {
   try {
-    const requests = await BorrowRequest.findAll({
-      include: [
-        { model: Equipment, attributes: ['name'] },
-        { model: User, attributes: ['name', 'email'] }
-      ],
-      order: [['createdAt', 'DESC']]
+    const user_id = req.user.id;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const offset = (page - 1) * limit;
+
+    const { count, rows: requests } = await BorrowRequest.findAndCountAll({
+      where: { user_id },
+      include: [{ 
+        model: Equipment, 
+        attributes: ['name', 'category'] 
+      }],
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
     });
-    res.json({ requests });
+
+    const totalPages = Math.ceil(count / limit);
+
+    return res.json(createResponse(true, 
+      { requests },
+      'Your requests retrieved successfully',
+      {
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalItems: count,
+          itemsPerPage: limit,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1
+        }
+      }
+    ));
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json(createResponse(false, null, 
+      'Server error occurred'));
   }
 };
